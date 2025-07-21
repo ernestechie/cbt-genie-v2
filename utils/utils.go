@@ -1,10 +1,11 @@
 package utils
 
 import (
+	"crypto/rand"
 	"log"
 
 	"github.com/ernestechie/cbt-genie-v2/config"
-	"github.com/ernestechie/cbt-genie-v2/schema"
+	schemas "github.com/ernestechie/cbt-genie-v2/schemas"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 
@@ -13,6 +14,25 @@ import (
 
 // Initialize validator
 var Validate = validator.New()
+
+// Hash a plain text string and return the hashed value
+
+const otpChars = "1234567890"
+
+func GenerateSecureOtp(length int) (string, error) {
+	buffer := make([]byte, length)
+	_, err := rand.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	otpCharsLength := len(otpChars)
+	for index := range length {
+		buffer[index] = otpChars[int(buffer[index])%otpCharsLength]
+	}
+
+	return string(buffer), nil
+}
 
 // Hash a plain text string and return the hashed value
 func GetHashedValue(inputVal string) (string, error) {
@@ -47,13 +67,12 @@ func ParseAndValidate(c *fiber.Ctx, data any) []config.ErrorResponse {
 		log.Println("Validation_error \n", err)
 
 		var errors []config.ErrorResponse
-		// for _, err := range err.(validator.ValidationErrors) {
 		for _, err := range err.(validator.ValidationErrors) {
 			// Create key for custom error message (e.g., "Name.required")
 			key := err.Field() + "." + err.Tag()
 
 			// Get custom message or fallback to default
-			message, exists := schema.CustomErrorMessages[key]
+			message, exists := schemas.CustomErrorMessages[key]
 			if !exists {
 				message = err.Error()
 			}

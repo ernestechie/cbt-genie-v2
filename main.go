@@ -12,6 +12,7 @@ var PORT_NUMBER string = ":10073"
 
 func main() {
 	app := fiber.New()
+	routes.RegisterAuthRoutes(app)
 	routes.RegisterUserRoutes(app)
 
 	// Middleware
