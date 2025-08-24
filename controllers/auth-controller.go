@@ -13,6 +13,41 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+
+func GetUserUpdates (user models.User, filter bson.D) (bson.D, error) {
+	updates := bson.D{}
+
+	// get the type of struct == User
+	typeData := reflect.TypeOf(user)
+
+	// get the values from the provided object: name -> John Smith
+	values := reflect.ValueOf(user)
+
+	// starting from index 1 to exclude the ID field
+	for i := range typeData.NumField() {
+		field := typeData.Field(i)   // get the field from the struct definition
+		val := values.Field(i)       // get the value from the specified field position
+		tag := field.Tag.Get("json") // from the field, get the json struct tag
+
+		// we want to avoid zero values, as the omitted fields from newBook
+		// corresponds to their zero values, and we only want provided fields
+		if !val.IsZero() && tag != "id" {
+			update := bson.E{Key: tag, Value: val.Interface()}
+			updates = append(updates, update)
+		}
+	}
+
+	updateFilter := bson.D{{Key: "$set", Value: updates}}
+	// _, err := usersColl.UpdateOne(context.TODO(), filter, updateFilter)
+	// if err != nil {
+	// 	log.Fatalf("error updating user: %v", err)
+	// 	return nil, err
+	// }
+
+	return updateFilter, nil
+}
+
+
 //*
 // GET STARTED
 // */
@@ -26,7 +61,7 @@ func GetStarted (c *fiber.Ctx) error {
 	var reqBody getStartedRequestBody
 	var foundUser models.User
 	var responseMessage string
-	var nextStep string
+	// var nextStep string
 
 	if errs := utils.ParseAndValidate(c, &reqBody); len(errs) > 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -74,9 +109,11 @@ func GetStarted (c *fiber.Ctx) error {
 	// Check if user exists
 	userExistsErr := usersColl.FindOne(context.TODO(), filter).Decode(&foundUser)
 		if userExistsErr != nil {
+			log.Print(userExistsErr)
+
 			// TODO: FIND A BETTER WAY TO DO THIS
 			if userExistsErr.Error() == "mongo: no documents in result" {
-				nextStep = "Onboarding"
+				// nextStep = "Onboarding"
 				responseMessage = "Account created succesfully! An OTP has been sent to your email."
 
 				log.Println("No existing. Creating new user...")
@@ -105,8 +142,10 @@ func GetStarted (c *fiber.Ctx) error {
 				} 
 				} else {
 				// create updates variable to hold all the update fields
-				updates := bson.D{}
-				nextStep = "Login"
+				// updates := bson.D{}
+				updates, _ := GetUserUpdates(foundUser, filter)
+
+				// nextStep = "Login"
 				responseMessage = "An OTP has been sent to your email."
 
 				// User Exists
@@ -114,24 +153,24 @@ func GetStarted (c *fiber.Ctx) error {
 				foundUser.OtpExpiry = otpExpiry
 
 				// get the type of struct == User
-				typeData := reflect.TypeOf(foundUser)
+				// typeData := reflect.TypeOf(foundUser)
 
-				// get the values from the provided object: name -> John Smith
-				values := reflect.ValueOf(foundUser)
+				// // get the values from the provided object: name -> John Smith
+				// values := reflect.ValueOf(foundUser)
 
-				// starting from index 1 to exclude the ID field
-				for i := range typeData.NumField() {
-					field := typeData.Field(i)   // get the field from the struct definition
-					val := values.Field(i)       // get the value from the specified field position
-					tag := field.Tag.Get("json") // from the field, get the json struct tag
+				// // starting from index 1 to exclude the ID field
+				// for i := range typeData.NumField() {
+				// 	field := typeData.Field(i)   // get the field from the struct definition
+				// 	val := values.Field(i)       // get the value from the specified field position
+				// 	tag := field.Tag.Get("json") // from the field, get the json struct tag
 
-					// we want to avoid zero values, as the omitted fields from newBook
-					// corresponds to their zero values, and we only want provided fields
-					if !val.IsZero() && tag != "id" {
-						update := bson.E{Key: tag, Value: val.Interface()}
-						updates = append(updates, update)
-					}
-				}
+				// 	// we want to avoid zero values, as the omitted fields from newBook
+				// 	// corresponds to their zero values, and we only want provided fields
+				// 	if !val.IsZero() && tag != "id" {
+				// 		update := bson.E{Key: tag, Value: val.Interface()}
+				// 		updates = append(updates, update)
+				// 	}
+				// }
 
 				updateFilter := bson.D{{Key: "$set", Value: updates}}
 				_, err := usersColl.UpdateOne(context.TODO(), filter, updateFilter)
@@ -152,10 +191,10 @@ func GetStarted (c *fiber.Ctx) error {
 		"data": fiber.Map{
 			"email": foundUser.Email,
 			"id": foundUser.ID,
-			"metadata": fiber.Map{
-				"next_step":	nextStep,
-				"time_stamp": time.Now().Local(),
-			},
+			// "metadata": fiber.Map{
+			// 	"next_step":	nextStep,
+			// 	"time_stamp": time.Now().Local(),
+			// },
 		},
 		"message": responseMessage,
 	})
@@ -202,7 +241,6 @@ func VerifyOtp (c *fiber.Ctx) error {
 				// nextStep = "Onboarding"
 				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 					"success": false,
-					"errors": userExistsErr.Error(),
 					"message": "User not found",
 				})
 			}
@@ -218,12 +256,15 @@ func VerifyOtp (c *fiber.Ctx) error {
 	}
 
 	foundUser.OtpToken = ""
-	_, err := usersColl.UpdateByID(context.TODO(), filter, foundUser)
+
+	updates, _ := GetUserUpdates(foundUser, filter)
+
+	updateFilter := bson.D{{Key: "$set", Value: updates}}
+	_, err := usersColl.UpdateOne(context.TODO(), filter, updateFilter)
 	if err != nil {
 		log.Fatalf("error updating user: %v", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"success": false,
-			"errors": err.Error(),
 			"message": "Error authenticating user",
 		})
 	}
