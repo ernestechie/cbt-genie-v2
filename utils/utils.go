@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"log"
+	"strings"
 
 	"github.com/ernestechie/cbt-genie-v2/config"
 	schemas "github.com/ernestechie/cbt-genie-v2/schemas"
@@ -69,8 +70,7 @@ func ParseAndValidate(c *fiber.Ctx, data any) []config.ErrorResponse {
 		var errors []config.ErrorResponse
 		for _, err := range err.(validator.ValidationErrors) {
 			// Create key for custom error message (e.g., "Name.required")
-			key := err.Field() + "." + err.Tag()
-
+			key := strings.ToLower(err.Field() + "." + err.Tag())
 			// Get custom message or fallback to default
 			message, exists := schemas.CustomErrorMessages[key]
 			if !exists {
