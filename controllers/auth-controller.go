@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/ernestechie/cbt-genie-v2/models"
 	"github.com/ernestechie/cbt-genie-v2/utils"
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -136,6 +138,11 @@ type verifyOtpRequestBody struct {
 
 // GET STARTED - /auth/verify-otp
 func VerifyOtp (c *fiber.Ctx) error {
+	var jwtSecret string
+	if jwtSecret = os.Getenv("JWT_SECRET"); jwtSecret == "" {
+		log.Fatal("You must set your 'JWT_SECRET' environment variable.")
+	}
+
 	var reqBody verifyOtpRequestBody
 	var foundUser models.User
 
@@ -193,6 +200,22 @@ func VerifyOtp (c *fiber.Ctx) error {
 		})
 	}
 
+	// Create a new token object, specifying signing method and the claims you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": foundUser.ID,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"errors": err.Error(),
+			"message": "Failed to authenticate token",
+		})
+	}
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"data": fiber.Map{
@@ -200,6 +223,7 @@ func VerifyOtp (c *fiber.Ctx) error {
 				"email": reqBody.Email,
 				"id": foundUser.ID,
 			},
+			"token": tokenString,
 		},
 		"message": "Email verified successfully",
 	})
