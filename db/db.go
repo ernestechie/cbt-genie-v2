@@ -34,9 +34,10 @@ func ConnectDB () *mongo.Client {
 	if err != nil {
 		panic(err)
 	}
+	// defer client.Disconnect(conte)
 	// defer func() {
 	// 	if err = client.Disconnect(context.TODO()); err != nil {
-	// 		panic(err)
+	// 		log.Println("Client_Connection_Error", err)
 	// 	}
 	// }()
 

@@ -16,19 +16,13 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-var client *mongo.Client
 var usersColl *mongo.Collection
 
 // Initialize mongodb client
 func init()  {
 	c := db.ConnectDB()
-
-	// Set global mongo client
-	client = c
-
 	usersColl = c.Database("db").Collection("users")
 }
-
 
 // Return a new user with the "created_at" & "update_at" fields
 func NewUser() models.User {
@@ -45,7 +39,7 @@ func RegisterUser (c *fiber.Ctx) error {
 		// Parse and validate request body using utils
 		if errs := utils.ParseAndValidate(c, &user); len(errs) > 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"success": true,
+				"success": false,
 				"errors": errs,
 				"message": "Error processing request",
 			})
@@ -114,9 +108,9 @@ func GetUser (c *fiber.Ctx) error {
 		if err != nil {
 			fmt.Println(err)
 
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"success": false,
-				"message": "Encountered an error while getting user",
+				"message": "User not found",
 			})
 		}
 
@@ -131,9 +125,9 @@ func GetUser (c *fiber.Ctx) error {
 // Get all users
 func GetAllUsers (c *fiber.Ctx) error {
 	sort := bson.D{{Key: "createdAt", Value: 1}}
-	filter := bson.D{{Key: "age", Value: bson.D{{Key: "$gte", Value: 18}}}}
+	// filter := bson.D{{Key: "age", Value: bson.D{{Key: "$gte", Value: 18}}}}
 
-	cursor, err := usersColl.Find(context.TODO(), filter, options.Find().SetSort(sort))
+	cursor, err := usersColl.Find(context.TODO(), bson.M{}, options.Find().SetSort(sort))
 	if err != nil {
 		log.Println("usersColl.Find \n", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

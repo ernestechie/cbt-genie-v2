@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"crypto/rand"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/ernestechie/cbt-genie-v2/config"
-	"github.com/ernestechie/cbt-genie-v2/schema"
+	schemas "github.com/ernestechie/cbt-genie-v2/schemas"
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/go-playground/validator/v10"
@@ -13,6 +17,25 @@ import (
 
 // Initialize validator
 var Validate = validator.New()
+
+// Hash a plain text string and return the hashed value
+
+const otpChars = "1234567890"
+
+func GenerateSecureOtp(length int) (string, error) {
+	buffer := make([]byte, length)
+	_, err := rand.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	otpCharsLength := len(otpChars)
+	for index := range length {
+		buffer[index] = otpChars[int(buffer[index])%otpCharsLength]
+	}
+
+	return string(buffer), nil
+}
 
 // Hash a plain text string and return the hashed value
 func GetHashedValue(inputVal string) (string, error) {
@@ -47,13 +70,11 @@ func ParseAndValidate(c *fiber.Ctx, data any) []config.ErrorResponse {
 		log.Println("Validation_error \n", err)
 
 		var errors []config.ErrorResponse
-		// for _, err := range err.(validator.ValidationErrors) {
 		for _, err := range err.(validator.ValidationErrors) {
 			// Create key for custom error message (e.g., "Name.required")
-			key := err.Field() + "." + err.Tag()
-
+			key := strings.ToLower(err.Field() + "." + err.Tag())
 			// Get custom message or fallback to default
-			message, exists := schema.CustomErrorMessages[key]
+			message, exists := schemas.CustomErrorMessages[key]
 			if !exists {
 				message = err.Error()
 			}
@@ -66,4 +87,27 @@ func ParseAndValidate(c *fiber.Ctx, data any) []config.ErrorResponse {
 	}
 
 	return nil
+}
+
+func VerifyJwt(tokenString string) (jwt.MapClaims, error) {
+	var jwtSecret string
+	if jwtSecret = os.Getenv("JWT_SECRET"); jwtSecret == "" {
+		log.Fatal("You must set your 'JWT_SECRET' environment variable.")
+	}
+
+	// Parse takes the token string and a function for looking up the key. The latter is especially
+	// useful if you use multiple keys for your application.  The standard is to use 'kid' in the
+	// head of the token to identify which key to use, but the parsed token (head and claims) is provided
+	// to the callback, providing flexibility.
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+		hmacSampleSecret := []byte(jwtSecret)
+		return hmacSampleSecret, nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	
+	if err != nil {
+		return nil, err
+	}
+
+	claims := token.Claims.(jwt.MapClaims)
+	return claims, nil
 }
