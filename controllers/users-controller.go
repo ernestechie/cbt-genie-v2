@@ -16,19 +16,13 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-var client *mongo.Client
 var usersColl *mongo.Collection
 
 // Initialize mongodb client
 func init()  {
 	c := db.ConnectDB()
-
-	// Set global mongo client
-	client = c
-
 	usersColl = c.Database("db").Collection("users")
 }
-
 
 // Return a new user with the "created_at" & "update_at" fields
 func NewUser() models.User {

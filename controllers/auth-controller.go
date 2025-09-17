@@ -216,12 +216,6 @@ func VerifyOtp (c *fiber.Ctx) error {
 		})
 	}
 
-	tokenClaims, err := utils.VerifyJwt(tokenString)
-	if err != nil {
-		fmt.Println("Error ", err)
-	}
-	fmt.Println(tokenClaims)
-
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"data": fiber.Map{
