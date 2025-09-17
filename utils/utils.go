@@ -21,9 +21,7 @@ import (
 
 // Initialize validator
 var Validate = validator.New()
-// Set to 2 minutes
-var NewTokenExpiryTime = time.Now().Add(time.Minute * 2).Unix()
-var RefreshTokenExpiryTime = time.Now().Add(time.Hour * 24).Unix()
+// Set to 5 minutes
 
 // Hash a plain text string and return the hashed value
 
@@ -116,6 +114,7 @@ func VerifyJwt(tokenString string) (*JwtUser, error) {
 		return hmacSampleSecret, nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	
+	fmt.Println("VerifyJwt (tokenString):", tokenString)
 	if err != nil {
 		return &JwtUser{}, err
 	}
@@ -154,19 +153,18 @@ func SignJwt(user *models.User) (*NewJwtUserReturn, error) {
 	// Create a new token object, specifying signing method and the claims you would like it to contain.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
-		"exp": NewTokenExpiryTime,
+		"exp": time.Now().Add(time.Minute * 2).Unix(), // 2 minutes
 	})
 
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
-		"exp": RefreshTokenExpiryTime,
+		"exp": time.Now().Add(time.Hour * 24).Unix(), // 24 hours
 	})
 
 	accessTokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return &NewJwtUserReturn{}, err
 	}
-
 
 	// TODO: Move refresh token to another function, and use a different signing protocol, more secured.
 	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))

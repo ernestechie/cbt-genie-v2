@@ -31,8 +31,6 @@ func ProtectRoute () fiber.Handler {
 			})
 		}
 
-		fmt.Println("Token ", tokenString)
-
 		var operationErrors []fiber.Map;
 
 		jwtUser, err := utils.VerifyJwt(tokenString)
@@ -47,6 +45,8 @@ func ProtectRoute () fiber.Handler {
 			})
 		}
 
+		fmt.Printf("Jwt_user %+v\n", jwtUser)
+
 		if len(operationErrors) > 0 {
 			return  c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"success": false,
@@ -54,8 +54,6 @@ func ProtectRoute () fiber.Handler {
 			"message": "Invalid or expired token",
 		})
 		}
-		
-		fmt.Printf("Jwt_user %+v\n", jwtUser)
 
 		return c.Next()
 	}

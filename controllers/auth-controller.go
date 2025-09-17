@@ -216,8 +216,8 @@ func VerifyOtp (c *fiber.Ctx) error {
 				"email": reqBody.Email,
 				"id": foundUser.ID,
 			},
-			"token": jwtArgs.AccessToken,
-			"refresh_token": jwtArgs.RefreshToken,
+			"token": &jwtArgs.AccessToken,
+			"refresh_token": &jwtArgs.RefreshToken,
 		},
 		"message": "Email verified successfully",
 	})
