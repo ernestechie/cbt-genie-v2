@@ -11,7 +11,6 @@ import (
 	"github.com/ernestechie/cbt-genie-v2/models"
 	"github.com/ernestechie/cbt-genie-v2/utils"
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -200,14 +199,8 @@ func VerifyOtp (c *fiber.Ctx) error {
 		})
 	}
 
-	// Create a new token object, specifying signing method and the claims you would like it to contain.
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": foundUser.ID,
-		"exp": time.Now().Add(time.Hour).Unix(),
-	})
-
+	jwtArgs, err := utils.SignJwt(&foundUser)
 	// Sign and get the complete encoded token as a string using the secret
-	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"success": false,
@@ -223,7 +216,8 @@ func VerifyOtp (c *fiber.Ctx) error {
 				"email": reqBody.Email,
 				"id": foundUser.ID,
 			},
-			"token": tokenString,
+			"token": jwtArgs.AccessToken,
+			"refresh_token": jwtArgs.RefreshToken,
 		},
 		"message": "Email verified successfully",
 	})
