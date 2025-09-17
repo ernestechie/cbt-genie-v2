@@ -54,9 +54,7 @@ func ProtectRoute () fiber.Handler {
 			"message": "Invalid or expired token",
 		})
 		}
-
-		fmt.Printf("Operation_errors %+v\n", operationErrors)
-		fmt.Printf("Token expiry is after now %+v\n", jwtUser.TokenExpiry.After(time.Now()))
+		
 		fmt.Printf("Jwt_user %+v\n", jwtUser)
 
 		return c.Next()
