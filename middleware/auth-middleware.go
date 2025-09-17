@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ernestechie/cbt-genie-v2/utils"
 	"github.com/gofiber/fiber/v2"
@@ -15,10 +16,10 @@ func ProtectRoute () fiber.Handler {
 		authHeader := c.Get("Authorization")
 		token := strings.Split(authHeader, "Bearer ")
 
-		if authHeader == "" || len(token) == 0 {
+		if len(token) > 2 || authHeader == "" || len(token) == 0 {
 			return  c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
-				"message": "Access denied! You are not authorized to perform this action",
+				"message": "Unauthorized",
 			})
 		}
 
@@ -26,19 +27,33 @@ func ProtectRoute () fiber.Handler {
 		if tokenString == "" || len(tokenString) == 0 {
 			return  c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
-				"message": "Access denied! You are not authorized to perform this action",
+				"message": "Unauthorized",
 			})
 		}
 
-		tokenClaims, err := utils.VerifyJwt(tokenString)
+		var operationErrors []fiber.Map;
+
+		jwtUser, err := utils.VerifyJwt(tokenString)
 		if err != nil {
-			return  c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
+			operationErrors = append(operationErrors, fiber.Map{
 				"message": err.Error(),
 			})
+		}	
+		if time.Now().After(jwtUser.TokenExpiry) {
+			operationErrors = append(operationErrors, fiber.Map{
+				"message": "access denied! session expired",
+			})
 		}
 
-		fmt.Println("Token_claims", tokenClaims)
+		fmt.Printf("Jwt_user %+v\n", jwtUser)
+
+		if len(operationErrors) > 0 {
+			return  c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"errors": operationErrors,
+			"message": "Invalid or expired token",
+		})
+		}
 
 		return c.Next()
 	}

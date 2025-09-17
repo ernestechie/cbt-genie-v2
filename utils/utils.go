@@ -2,11 +2,15 @@ package utils
 
 import (
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ernestechie/cbt-genie-v2/config"
+	"github.com/ernestechie/cbt-genie-v2/models"
 	schemas "github.com/ernestechie/cbt-genie-v2/schemas"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -17,6 +21,7 @@ import (
 
 // Initialize validator
 var Validate = validator.New()
+// Set to 5 minutes
 
 // Hash a plain text string and return the hashed value
 
@@ -89,7 +94,12 @@ func ParseAndValidate(c *fiber.Ctx, data any) []config.ErrorResponse {
 	return nil
 }
 
-func VerifyJwt(tokenString string) (jwt.MapClaims, error) {
+type JwtUser struct {
+	TokenExpiry 	time.Time
+	UserId				string
+}
+
+func VerifyJwt(tokenString string) (*JwtUser, error) {
 	var jwtSecret string
 	if jwtSecret = os.Getenv("JWT_SECRET"); jwtSecret == "" {
 		log.Fatal("You must set your 'JWT_SECRET' environment variable.")
@@ -104,10 +114,66 @@ func VerifyJwt(tokenString string) (jwt.MapClaims, error) {
 		return hmacSampleSecret, nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	
+	fmt.Println("VerifyJwt (tokenString):", tokenString)
 	if err != nil {
-		return nil, err
+		return &JwtUser{}, err
 	}
 
 	claims := token.Claims.(jwt.MapClaims)
-	return claims, nil
+	sub :=  claims["sub"]
+	userId := fmt.Sprintf("%v", sub)
+	if userId == "" {
+		return &JwtUser{}, errors.New("invalid token. cannot find user")
+	} 
+
+	var expTime time.Time
+	exp :=	claims["exp"]
+	// Using type assertion
+	if expFloat, ok := exp.(float64); ok {
+		expTime = time.Unix(int64(expFloat), 0)
+	}
+
+	return &JwtUser{
+		UserId: userId,
+		TokenExpiry: expTime,
+	}, nil
+}
+
+type NewJwtUserReturn struct {
+	RefreshToken 	string
+	AccessToken		string
+}
+
+func SignJwt(user *models.User) (*NewJwtUserReturn, error) {
+	var jwtSecret string
+	if jwtSecret = os.Getenv("JWT_SECRET"); jwtSecret == "" {
+		log.Fatal("You must set your 'JWT_SECRET' environment variable.")
+	}
+
+	// Create a new token object, specifying signing method and the claims you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(time.Minute * 2).Unix(), // 2 minutes
+	})
+
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(time.Hour * 24).Unix(), // 24 hours
+	})
+
+	accessTokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return &NewJwtUserReturn{}, err
+	}
+
+	// TODO: Move refresh token to another function, and use a different signing protocol, more secured.
+	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return &NewJwtUserReturn{}, err
+	}
+
+	return &NewJwtUserReturn{
+		RefreshToken: refreshTokenString,
+		AccessToken: accessTokenString,
+	}, nil
 }
